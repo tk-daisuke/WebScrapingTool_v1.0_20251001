@@ -70,6 +70,10 @@ class SettingsGUI:
             'timeout': '30',
             'implicit_wait': '10'
         }
+        self.config['Scheduler'] = {
+            'run_interval_minutes': '60',
+            'max_runtime_hours': '8'
+        }
     
     def save_config(self):
         """設定ファイルを保存する"""
@@ -133,13 +137,24 @@ class SettingsGUI:
             [sg.HSeparator()],
             [sg.Text('ヘッドレスモード: ブラウザウィンドウを表示せずに実行')]
         ]
+
+        # スケジュール設定タブ
+        scheduler_layout = [
+            [sg.Text('実行間隔(分):', size=(15, 1)),
+             sg.Input(self.config.get('Scheduler', 'run_interval_minutes', fallback='60'), key='-RUN_INTERVAL-', size=(10, 1))],
+            [sg.Text('最大稼働時間(時間):', size=(15, 1)),
+             sg.Input(self.config.get('Scheduler', 'max_runtime_hours', fallback='8'), key='-MAX_RUNTIME-', size=(10, 1))],
+            [sg.HSeparator()],
+            [sg.Text('注意: 実行ボタンを押すと、スケジュール実行が開始されます。')]
+        ]
         
         # タブレイアウト
         tab_group = [
             [sg.Tab('スクレイピング', scraper_layout, key='-TAB_SCRAPER-')],
             [sg.Tab('Excel出力', excel_layout, key='-TAB_EXCEL-')],
             [sg.Tab('Slack通知', slack_layout, key='-TAB_SLACK-')],
-            [sg.Tab('ブラウザ', browser_layout, key='-TAB_BROWSER-')]
+            [sg.Tab('ブラウザ', browser_layout, key='-TAB_BROWSER-')],
+            [sg.Tab('スケジュール', scheduler_layout, key='-TAB_SCHEDULER-')]
         ]
         
         # メインレイアウト
@@ -189,6 +204,10 @@ class SettingsGUI:
             self.config.set('Browser', 'headless', str(values['-HEADLESS-']))
             self.config.set('Browser', 'timeout', values['-TIMEOUT-'])
             self.config.set('Browser', 'implicit_wait', values['-IMPLICIT_WAIT-'])
+
+            # スケジュール設定
+            self.config.set('Scheduler', 'run_interval_minutes', values['-RUN_INTERVAL-'])
+            self.config.set('Scheduler', 'max_runtime_hours', values['-MAX_RUNTIME-'])
             
             return True
             
@@ -221,28 +240,17 @@ class SettingsGUI:
             return False
     
     def run_scraping(self, progress_window):
-        """スクレイピングを実行する（別スレッドで実行）"""
+        """スクレイピングをスケジュール実行する（別スレッドで実行）"""
         try:
-            from main import run_scraping_process
+            from main import run_scheduled_scraping
             
-            # 進行状況の更新
-            progress_window['-PROGRESS_TEXT-'].update('認証中...')
-            progress_window['-PROGRESS-'].update(20)
-            progress_window['-LOG-'].update('認証処理を開始しています...\n', append=True)
+            progress_window['-LOG-'].update('スケジュール実行を開始します...\n', append=True)
             
-            # メイン処理を実行
-            result = run_scraping_process(self.config, progress_window)
-            
-            if result:
-                progress_window['-PROGRESS_TEXT-'].update('完了')
-                progress_window['-PROGRESS-'].update(100)
-                progress_window['-LOG-'].update('スクレイピングが正常に完了しました。\n', append=True)
-            else:
-                progress_window['-PROGRESS_TEXT-'].update('エラー')
-                progress_window['-LOG-'].update('スクレイピング中にエラーが発生しました。\n', append=True)
+            # スケジュール実行
+            run_scheduled_scraping(self.config, progress_window)
             
         except Exception as e:
-            logger.error(f"スクレイピング実行エラー: {e}")
+            logger.error(f"スケジュール実行エラー: {e}")
             progress_window['-PROGRESS_TEXT-'].update('エラー')
             progress_window['-LOG-'].update(f'エラー: {e}\n', append=True)
     

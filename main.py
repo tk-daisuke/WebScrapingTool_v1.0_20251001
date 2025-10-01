@@ -7,7 +7,8 @@ import configparser
 import os
 import sys
 import logging
-from datetime import datetime
+import time
+from datetime import datetime, timedelta
 import traceback
 
 # 自作モジュールのインポート
@@ -180,6 +181,69 @@ def run_scraping_process(config, progress_window=None):
             auth.close()
 
 
+def run_scheduled_scraping(config, progress_window):
+    """スケジュールに従ってスクレイピングを繰り返し実行する"""
+    try:
+        run_interval_minutes = config.getint('Scheduler', 'run_interval_minutes', fallback=60)
+        max_runtime_hours = config.getint('Scheduler', 'max_runtime_hours', fallback=8)
+        
+        start_time = datetime.now()
+        end_time = start_time + timedelta(hours=max_runtime_hours)
+        
+        run_count = 0
+        while datetime.now() < end_time:
+            run_count += 1
+            logger.info(f"スケジュール実行 {run_count}回目")
+            
+            if progress_window:
+                progress_window['-LOG-'].update(f'\n--- {datetime.now().strftime("%Y-%m-%d %H:%M:%S")} スケジュール実行 {run_count}回目 ---\n', append=True)
+
+            # スクレイピング実行
+            success = run_scraping_process(config, progress_window)
+            
+            if not success:
+                logger.error("スクレイピング処理に失敗したため、スケジュールを中断します")
+                if progress_window:
+                    progress_window['-LOG-'].update('処理に失敗したため、スケジュールを中断します。\n', append=True)
+                break
+
+            # 次の実行までの待機時間
+            wait_seconds = run_interval_minutes * 60
+            next_run_time = datetime.now() + timedelta(seconds=wait_seconds)
+
+            if next_run_time > end_time:
+                logger.info("最大稼働時間に達するため、次の実行は行いません")
+                if progress_window:
+                    progress_window['-LOG-'].update('最大稼働時間に達するため、スケジュールを終了します。\n', append=True)
+                break
+
+            logger.info(f"次の実行まで {run_interval_minutes} 分待機します (次の実行時刻: {next_run_time.strftime('%H:%M:%S')})")
+            if progress_window:
+                progress_window['-LOG-'].update(f'次の実行まで {run_interval_minutes} 分待機します...\n', append=True)
+            
+            # GUIのキャンセルボタンをチェックしながら待機
+            for _ in range(wait_seconds):
+                event, _ = progress_window.read(timeout=1000)
+                if event in (None, '-CANCEL_RUN-'):
+                    logger.info("スケジュール実行がキャンセルされました")
+                    if progress_window:
+                        progress_window['-LOG-'].update('スケジュールがキャンセルされました。\n', append=True)
+                    return
+                if datetime.now() >= end_time:
+                    break
+        
+        logger.info("スケジュール実行が完了しました")
+        if progress_window:
+            progress_window['-LOG-'].update('\nスケジュール実行がすべて完了しました。\n', append=True)
+            progress_window['-PROGRESS_TEXT-'].update('スケジュール完了')
+
+    except Exception as e:
+        logger.error(f"スケジュール実行エラー: {e}")
+        logger.error(traceback.format_exc())
+        if progress_window:
+            progress_window['-LOG-'].update(f'スケジュール実行中にエラーが発生しました: {e}\n', append=True)
+
+
 def main():
     """メイン関数"""
     try:
@@ -226,45 +290,6 @@ def main():
         logger.error(f"メイン処理エラー: {e}")
         logger.error(traceback.format_exc())
         sys.exit(1)
-
-
-def run_sample():
-    """サンプル実行関数（テスト用）"""
-    try:
-        print("サンプルスクレイピングを実行します...")
-        
-        # サンプル用設定を作成
-        config = configparser.ConfigParser()
-        config['Scraper'] = {
-            'target_url': 'https://github.com/trending',
-            'login_url': 'https://github.com/login',
-            'username': '',
-            'password': ''
-        }
-        
-        config['Excel'] = {
-            'output_filename': 'sample_data_{timestamp}.xlsx',
-            'output_directory': './output'
-        }
-        
-        config['Slack'] = {
-            'webhook_url': '',
-            'channel': '#general',
-            'username': 'Sample Bot'
-        }
-        
-        config['Browser'] = {
-            'headless': 'False',
-            'timeout': '30',
-            'implicit_wait': '10'
-        }
-        
-        # サンプル処理を実行
-        return run_scraping_process(config)
-        
-    except Exception as e:
-        print(f"サンプル実行エラー: {e}")
-        return False
 
 
 if __name__ == "__main__":

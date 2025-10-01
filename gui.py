@@ -51,8 +51,7 @@ class SettingsGUI:
         self.config['Scraper'] = {
             'target_url': 'https://example.com/kpi-dashboard',
             'login_url': 'https://example.com/login',
-            'username': '',
-            'password': ''
+            
         }
         
         self.config['Excel'] = {
@@ -93,10 +92,7 @@ class SettingsGUI:
              sg.Input(self.config.get('Scraper', 'target_url', fallback=''), key='-TARGET_URL-', size=(50, 1))],
             [sg.Text('ログインページURL:', size=(15, 1)), 
              sg.Input(self.config.get('Scraper', 'login_url', fallback=''), key='-LOGIN_URL-', size=(50, 1))],
-            [sg.Text('ユーザー名:', size=(15, 1)), 
-             sg.Input(self.config.get('Scraper', 'username', fallback=''), key='-USERNAME-', size=(30, 1))],
-            [sg.Text('パスワード:', size=(15, 1)), 
-             sg.Input(self.config.get('Scraper', 'password', fallback=''), key='-PASSWORD-', size=(30, 1), password_char='*')],
+            
             [sg.HSeparator()],
             [sg.Text('注意: USBセキュリティキーによる認証は手動で行う必要があります。', text_color='red')]
         ]
@@ -178,8 +174,7 @@ class SettingsGUI:
             # スクレイピング設定
             self.config.set('Scraper', 'target_url', values['-TARGET_URL-'])
             self.config.set('Scraper', 'login_url', values['-LOGIN_URL-'])
-            self.config.set('Scraper', 'username', values['-USERNAME-'])
-            self.config.set('Scraper', 'password', values['-PASSWORD-'])
+            
             
             # Excel設定
             self.config.set('Excel', 'output_filename', values['-OUTPUT_FILENAME-'])
